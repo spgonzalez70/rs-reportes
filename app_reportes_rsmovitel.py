@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import json
@@ -6,11 +5,13 @@ import os
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Gestión Comercial RSMovitel", layout="wide")
-st.markdown("""<style>
-    .main { background-color: #f4f9f4; }
-    .stApp { font-family: 'Segoe UI', sans-serif; }
-    h1, h2, h3 { color: #006400; }
-</style>""", unsafe_allow_html=True)
+st.markdown("""
+    <style>
+        .main { background-color: #f4f9f4; }
+        .stApp { font-family: 'Segoe UI', sans-serif; }
+        h1, h2, h3 { color: #006400; }
+    </style>
+""", unsafe_allow_html=True)
 
 def cargar_usuarios():
     with open("users.json", "r") as f:
@@ -150,11 +151,17 @@ if st.session_state.usuario:
             row = visitas[(visitas["Cliente"] == st.session_state.editar_cliente) & (visitas["Nombre Comercial"] == "COMERCIAL")].iloc[0]
             idx = visitas[(visitas["Cliente"] == row["Cliente"]) & (visitas["Fecha"] == row["Fecha"])].index[0]
             with st.form("editar_form"):
+                servicios_actuales = [s.strip() for s in row["Servicio"].split(",") if s.strip()]
+                ofertas_actuales = [o.strip() for o in row["Ofertas Presentadas"].split(",") if o.strip()]
+                servicios_editar = st.multiselect("Servicio interesado", ["Telefonía", "Energía", "Alarmas", "Software"], default=servicios_actuales)
+                ofertas_editar = st.multiselect("Ofertas Presentadas", ["Vodafone", "Yoigo", "Orange", "O2", "RSmovitel", "Plenitude u otras", "ClassicGes"], default=ofertas_actuales)
                 cerrado_nuevo = st.radio("¿Se cerró la venta?", ["Sí", "No"], index=0 if row["Cerrado"] == "Sí" else 1)
                 estado_nuevo = st.selectbox("Estado actual", ["Pendiente", "Volver a llamar", "Cerrado", "Rechazado"], index=["Pendiente", "Volver a llamar", "Cerrado", "Rechazado"].index(row["Estado"]))
                 proxima_nueva = st.date_input("Próxima acción", value=pd.to_datetime(row["Próxima Acción"]))
-                observ_nueva = st.text_area("Observaciones", value=row["Observaciones"])
+                observ_nueva = st.text_area("Observaciones", value="" if pd.isna(row["Observaciones"]) else row["Observaciones"])
                 if st.form_submit_button("Actualizar visita"):
+                    visitas.at[idx, "Servicio"] = ", ".join(servicios_editar)
+                    visitas.at[idx, "Ofertas Presentadas"] = ", ".join(ofertas_editar)
                     visitas.at[idx, "Cerrado"] = cerrado_nuevo
                     visitas.at[idx, "Estado"] = estado_nuevo
                     visitas.at[idx, "Próxima Acción"] = proxima_nueva
