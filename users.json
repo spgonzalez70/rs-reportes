@@ -1,0 +1,17 @@
+{
+    "admin": {
+        "password": "1234",
+        "first_login": true,
+        "last_change": "2025-07-23"
+    },
+    "COMERCIAL": {
+        "password": "1234",
+        "first_login": true,
+        "last_change": "2025-07-23"
+    },
+    "BACKOFFICE": {
+        "password": "1234",
+        "first_login": true,
+        "last_change": "2025-07-23"
+    }
+}
