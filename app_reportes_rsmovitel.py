@@ -100,7 +100,7 @@ if st.session_state.usuario:
 
         # ---- MODULO COMERCIAL ----
         if st.session_state.modulo == "Comercial" or st.session_state.usuario == "COMERCIAL":
-           st.success("Bienvenido, " + st.session_state.usuario)
+                  st.success("Bienvenido, " + st.session_state.usuario)
         st.subheader("📌 Ofertas/Visitas Registradas")
 
         # NUEVO: Filtro por estado
@@ -110,22 +110,17 @@ if st.session_state.usuario:
         else:
             tabla_mostrar = visitas[(visitas["Nombre Comercial"] == "COMERCIAL") & (visitas["Estado"] == estado_filtro)]
         st.dataframe(tabla_mostrar)
-            pendientes = visitas[(visitas["Nombre Comercial"] == "COMERCIAL") & (visitas["Estado"] == "Pendiente")]
-            if not pendientes.empty:
-                st.dataframe(pendientes)
-            else:
-                st.info("No hay visitas pendientes.")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("➕ Nueva visita"):
-                    st.session_state.nuevo_registro = True
-                    st.session_state.editar_cliente = None
-            with col2:
-                cliente_editable = st.selectbox("Selecciona cliente para editar", pendientes["Cliente"].unique() if not pendientes.empty else [])
-                if st.button("✏️ Editar visita"):
-                    st.session_state.editar_cliente = cliente_editable
-                    st.session_state.nuevo_registro = False
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("➕ Nueva visita"):
+                st.session_state.nuevo_registro = True
+                st.session_state.editar_cliente = None
+        with col2:
+            cliente_editable = st.selectbox("Selecciona cliente para editar", tabla_mostrar["Cliente"].unique() if not tabla_mostrar.empty else [])
+            if st.button("✏️ Editar visita"):
+                st.session_state.editar_cliente = cliente_editable
+                st.session_state.nuevo_registro = False
 
             if st.session_state.nuevo_registro:
                 st.markdown('<div class="block-title">🗂️ Datos Generales</div>', unsafe_allow_html=True)
