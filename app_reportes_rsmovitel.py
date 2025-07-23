@@ -100,8 +100,16 @@ if st.session_state.usuario:
 
         # ---- MODULO COMERCIAL ----
         if st.session_state.modulo == "Comercial" or st.session_state.usuario == "COMERCIAL":
-            st.success("Bienvenido, " + st.session_state.usuario)
-            st.subheader("📌 Ofertas Pendientes")
+           st.success("Bienvenido, " + st.session_state.usuario)
+        st.subheader("📌 Ofertas/Visitas Registradas")
+
+        # NUEVO: Filtro por estado
+        estado_filtro = st.selectbox("Filtrar por estado", ["Todos"] + list(visitas["Estado"].dropna().unique()))
+        if estado_filtro == "Todos":
+            tabla_mostrar = visitas[visitas["Nombre Comercial"] == "COMERCIAL"]
+        else:
+            tabla_mostrar = visitas[(visitas["Nombre Comercial"] == "COMERCIAL") & (visitas["Estado"] == estado_filtro)]
+        st.dataframe(tabla_mostrar)
             pendientes = visitas[(visitas["Nombre Comercial"] == "COMERCIAL") & (visitas["Estado"] == "Pendiente")]
             if not pendientes.empty:
                 st.dataframe(pendientes)
