@@ -1,85 +1,232 @@
-
 import streamlit as st
 import pandas as pd
+import json
 import os
+from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Reportes RSMovitel", layout="wide")
+st.set_page_config(page_title="Gestión Comercial RSMovitel", layout="wide")
+st.markdown("""
+    <style>
+        .main { background-color: #f4f9f4; }
+        .stApp { font-family: 'Segoe UI', sans-serif; }
+        h1, h2, h3 { color: #006400; }
+        .block-title { font-weight: bold; font-size: 1.2em; margin-top: 1.2em; }
+    </style>
+""", unsafe_allow_html=True)
 
-st.title("📊 Sistema de Reportes Semanales - RSMovitel")
+def cargar_usuarios():
+    with open("users.json", "r") as f:
+        return json.load(f)
 
-tipo_reporte = st.sidebar.selectbox("Selecciona tipo de reporte", ["Comercial", "Backoffice"])
+def guardar_usuarios(usuarios):
+    with open("users.json", "w") as f:
+        json.dump(usuarios, f, indent=4)
 
-if tipo_reporte == "Comercial":
-    st.header("🧑‍💼 Reporte Comercial")
-    with st.form("form_comercial"):
-        semana = st.text_input("Semana")
-        nombre = st.text_input("Nombre del Comercial")
-        zona = st.text_input("Zona / Territorio")
-        dias_activo = st.number_input("Días Activos en Calle", 0, 7)
-        visitas = st.number_input("Visitas Presenciales", 0)
-        llamadas = st.number_input("Llamadas Comerciales", 0)
-        oportunidades = st.number_input("Oportunidades Detectadas", 0)
-        presupuestos = st.number_input("Presupuestos Entregados", 0)
-        cierres = st.number_input("Cierres Realizados", 0)
-        ratio = st.number_input("Ratio Cierre / Oportunidades (%)", 0.0, 100.0)
-        importe = st.number_input("Importe Total Ventas (€)", 0.0)
-        comision = st.number_input("Comisión Estimada (€)", 0.0)
-        tlf = st.number_input("Ventas Telefonía (unidades)", 0)
-        marca = st.number_input("Altas Marca Propia (líneas)", 0)
-        energia = st.number_input("Contratos Energía", 0)
-        alarmas = st.number_input("Instalaciones Alarmas", 0)
-        software = st.number_input("Licencias Software", 0)
-        observaciones = st.text_area("Clientes destacables / Objeciones / Soporte requerido")
-        submit = st.form_submit_button("Guardar")
-        if submit:
-            nuevo = pd.DataFrame([{
-                "Semana": semana, "Nombre Comercial": nombre, "Zona / Territorio": zona,
-                "Días Activos en Calle": dias_activo, "Visitas Presenciales": visitas,
-                "Llamadas Comerciales": llamadas, "Oportunidades Detectadas": oportunidades,
-                "Presupuestos Entregados": presupuestos, "Cierres Realizados": cierres,
-                "Ratio Cierre/Oportunidades (%)": ratio, "Importe Total Ventas (€)": importe,
-                "Comisión Estimada (€)": comision, "Ventas Telefonía (uds)": tlf,
-                "Altas Marca Propia (líneas)": marca, "Contratos Energía": energia,
-                "Instalaciones Alarmas": alarmas, "Licencias Software": software,
-                "Clientes destacables / Objeciones / Soporte requerido": observaciones
-            }])
-            if not os.path.exists("reportes_comercial.csv"):
-                nuevo.to_csv("reportes_comercial.csv", index=False)
+def cargar_visitas():
+    archivo = "visitas_comercial.csv"
+    if os.path.exists(archivo):
+        df = pd.read_csv(archivo)
+        df["Fecha"] = pd.to_datetime(df["Fecha"], errors='coerce')
+        return df
+    else:
+        return pd.DataFrame(columns=[
+            "Fecha", "Nombre Comercial", "Cliente", "Servicio", "Oportunidad", "Presupuesto", "Cerrado",
+            "Estado", "Próxima Acción", "Observaciones", "Ofertas Presentadas", "Mejora Luz",
+            "Líneas Móviles", "Fibras", "Centralita", "Puestos", "IP Fija"
+        ])
+
+def guardar_visitas(df):
+    df.to_csv("visitas_comercial.csv", index=False)
+
+usuarios = cargar_usuarios()
+visitas = cargar_visitas()
+
+st.title("🔐 Gestión Comercial - RSMovitel")
+username = st.sidebar.text_input("Usuario")
+password = st.sidebar.text_input("Contraseña", type="password")
+login_btn = st.sidebar.button("Iniciar Sesión")
+
+if "usuario" not in st.session_state:
+    st.session_state.usuario = None
+    st.session_state.nuevo_registro = False
+    st.session_state.editar_cliente = None
+
+if login_btn:
+    if username in usuarios and usuarios[username]["password"] == password:
+        st.session_state.usuario = username
+        st.session_state.first_login = usuarios[username]["first_login"]
+        st.session_state.last_change = usuarios[username]["last_change"]
+    else:
+        st.error("Credenciales incorrectas")
+
+if st.session_state.usuario:
+    dias_transcurridos = (datetime.today().date() - datetime.strptime(st.session_state.last_change, "%Y-%m-%d").date()).days
+    if st.session_state.first_login or dias_transcurridos > 180:
+        st.warning("⚠️ Debes cambiar tu contraseña antes de continuar.")
+        new_pass = st.text_input("Nueva Contraseña", type="password")
+        confirm_pass = st.text_input("Confirmar Contraseña", type="password")
+        if st.button("Actualizar Contraseña"):
+            if new_pass == confirm_pass and new_pass.strip() != "":
+                usuarios[st.session_state.usuario]["password"] = new_pass
+                usuarios[st.session_state.usuario]["first_login"] = False
+                usuarios[st.session_state.usuario]["last_change"] = str(datetime.today().date())
+                guardar_usuarios(usuarios)
+                st.success("Contraseña actualizada. Reinicia sesión.")
+                st.session_state.usuario = None
             else:
-                antiguo = pd.read_csv("reportes_comercial.csv")
-                pd.concat([antiguo, nuevo]).to_csv("reportes_comercial.csv", index=False)
-            st.success("Reporte comercial guardado correctamente.")
+                st.error("Las contraseñas no coinciden.")
+    elif st.session_state.usuario == "COMERCIAL":
+        st.success("Bienvenido, COMERCIAL")
 
-else:
-    st.header("🗂️ Reporte Backoffice")
-    with st.form("form_backoffice"):
-        semana = st.text_input("Semana")
-        nombre = st.text_input("Nombre del Empleado")
-        dias = st.number_input("Días Trabajados", 0, 7)
-        horas = st.number_input("Horas Totales", 0.0)
-        tlf = st.number_input("Tramitaciones Telefonía", 0)
-        energia = st.number_input("Tramitaciones Energía", 0)
-        alarmas = st.number_input("Tramitaciones Alarmas", 0)
-        software = st.number_input("Tramitaciones Software", 0)
-        correctas = st.number_input("Altas Correctas a la Primera (%)", 0.0, 100.0)
-        tiempo = st.number_input("Tiempo Medio Tramitación (min)", 0.0)
-        incidencias = st.number_input("Incidencias Internas", 0)
-        soporte = st.number_input("Soporte a Colaboradores (nº)", 0)
-        carga = st.slider("Carga Emocional (1-5)", 1, 5)
-        observaciones = st.text_area("Observaciones / Recomendaciones")
-        submit = st.form_submit_button("Guardar")
-        if submit:
-            nuevo = pd.DataFrame([{
-                "Semana": semana, "Nombre Empleado": nombre, "Días Trabajados": dias,
-                "Horas Totales": horas, "Tramitaciones Telefonía": tlf, "Tramitaciones Energía": energia,
-                "Tramitaciones Alarmas": alarmas, "Tramitaciones Software": software,
-                "Altas Correctas a la Primera (%)": correctas, "Tiempo Medio Tramitación (min)": tiempo,
-                "Incidencias Internas": incidencias, "Soporte a Colaboradores (nº)": soporte,
-                "Carga Emocional (1-5)": carga, "Observaciones / Recomendaciones": observaciones
-            }])
-            if not os.path.exists("reportes_backoffice.csv"):
-                nuevo.to_csv("reportes_backoffice.csv", index=False)
-            else:
-                antiguo = pd.read_csv("reportes_backoffice.csv")
-                pd.concat([antiguo, nuevo]).to_csv("reportes_backoffice.csv", index=False)
-            st.success("Reporte backoffice guardado correctamente.")
+        st.subheader("📌 Ofertas Pendientes")
+        pendientes = visitas[(visitas["Nombre Comercial"] == "COMERCIAL") & (visitas["Estado"] == "Pendiente")]
+        if not pendientes.empty:
+            st.dataframe(pendientes)
+        else:
+            st.info("No hay visitas pendientes.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("➕ Nueva visita"):
+                st.session_state.nuevo_registro = True
+                st.session_state.editar_cliente = None
+        with col2:
+            cliente_editable = st.selectbox("Selecciona cliente para editar", pendientes["Cliente"].unique() if not pendientes.empty else [])
+            if st.button("✏️ Editar visita"):
+                st.session_state.editar_cliente = cliente_editable
+                st.session_state.nuevo_registro = False
+
+        if st.session_state.nuevo_registro:
+            st.markdown('<div class="block-title">🗂️ Datos Generales</div>', unsafe_allow_html=True)
+            with st.form("nuevo_form"):
+                fecha = st.date_input("Fecha de visita", value=datetime.today())
+                cliente = st.text_input("Nombre del cliente o empresa")
+                if cliente in visitas["Cliente"].values:
+                    st.warning("⚠️ Ya existe una visita registrada con este nombre. Considera editarla en lugar de duplicarla.")
+                servicio = st.multiselect("Servicios interesados", ["Telefonía", "Energía", "Alarmas", "Software"])
+                oportunidad = st.radio("¿Hubo oportunidad comercial?", ["Sí", "No"], horizontal=True)
+                presupuesto = st.radio("¿Se entregó presupuesto?", ["Sí", "No"], horizontal=True)
+                cerrado = st.radio("¿Se cerró la venta?", ["Sí", "No"], horizontal=True)
+                estado = st.selectbox("Estado actual", ["Pendiente", "Volver a llamar", "Cerrado", "Rechazado"])
+                proxima = st.date_input("Próxima acción", value=fecha + timedelta(days=7))
+
+                st.markdown('<div class="block-title">📝 Ofertas presentadas</div>', unsafe_allow_html=True)
+                ofertas = st.multiselect(
+                    "Ofertas presentadas con",
+                    ["Vodafone", "Yoigo", "Orange", "O2", "RSmovitel", "Plenitude u otras", "ClassicGes"]
+                )
+
+                if "Telefonía" in servicio:
+                    st.markdown('<div class="block-title">📱 Datos Telefonía</div>', unsafe_allow_html=True)
+                    lineas = st.number_input("Nº Líneas Móviles", 0)
+                    fibras = st.number_input("Nº Fibras", 0)
+                    centralita = st.radio("¿Tiene centralita?", ["Sí", "No"], horizontal=True)
+                    puestos = st.number_input("Nº Puestos Centralita", 0)
+                    ip_fija = st.radio("¿Dispone de IP fija?", ["Sí", "No"], horizontal=True)
+                else:
+                    lineas = fibras = puestos = centralita = ip_fija = ""
+
+                if "Energía" in servicio:
+                    st.markdown('<div class="block-title">⚡ Datos Energía</div>', unsafe_allow_html=True)
+                    mejora_luz = st.radio("¿Se puede mejorar la oferta de luz?", ["Sí", "No"], horizontal=True)
+                else:
+                    mejora_luz = ""
+
+                st.markdown('<div class="block-title">🗒️ Observaciones</div>', unsafe_allow_html=True)
+                observaciones = st.text_area("Observaciones")
+
+                if st.form_submit_button("Guardar visita"):
+                    nueva_visita = pd.DataFrame([{
+                        "Fecha": fecha,
+                        "Nombre Comercial": "COMERCIAL",
+                        "Cliente": cliente,
+                        "Servicio": ", ".join(servicio),
+                        "Oportunidad": oportunidad,
+                        "Presupuesto": presupuesto,
+                        "Cerrado": cerrado,
+                        "Estado": estado,
+                        "Próxima Acción": proxima,
+                        "Observaciones": observaciones,
+                        "Ofertas Presentadas": ", ".join(ofertas),
+                        "Mejora Luz": mejora_luz,
+                        "Líneas Móviles": lineas,
+                        "Fibras": fibras,
+                        "Centralita": centralita,
+                        "Puestos": puestos,
+                        "IP Fija": ip_fija
+                    }])
+                    visitas = pd.concat([visitas, nueva_visita], ignore_index=True)
+                    guardar_visitas(visitas)
+                    st.success("✅ Visita registrada correctamente.")
+                    st.session_state.nuevo_registro = False
+
+        if st.session_state.editar_cliente:
+            row = visitas[(visitas["Cliente"] == st.session_state.editar_cliente) & (visitas["Nombre Comercial"] == "COMERCIAL")].iloc[0]
+            idx = visitas[(visitas["Cliente"] == row["Cliente"]) & (visitas["Fecha"] == row["Fecha"])].index[0]
+            # Preparar valores robustos
+            servicios_val = row["Servicio"]
+            if not isinstance(servicios_val, str):
+                servicios_val = ""
+            servicios_actuales = [s.strip() for s in servicios_val.split(",") if s.strip()]
+
+            ofertas_val = row["Ofertas Presentadas"]
+            if not isinstance(ofertas_val, str):
+                ofertas_val = ""
+            ofertas_actuales = [o.strip() for o in ofertas_val.split(",") if o.strip()]
+
+            st.markdown('<div class="block-title">🗂️ Datos Generales</div>', unsafe_allow_html=True)
+            with st.form("editar_form"):
+                fecha = st.date_input("Fecha de visita", value=pd.to_datetime(row["Fecha"]))
+                cliente = st.text_input("Nombre del cliente o empresa", value=row["Cliente"], disabled=True)
+                servicio = st.multiselect("Servicios interesados", ["Telefonía", "Energía", "Alarmas", "Software"], default=servicios_actuales)
+                oportunidad = st.radio("¿Hubo oportunidad comercial?", ["Sí", "No"], index=0 if row["Oportunidad"] == "Sí" else 1, horizontal=True)
+                presupuesto = st.radio("¿Se entregó presupuesto?", ["Sí", "No"], index=0 if row["Presupuesto"] == "Sí" else 1, horizontal=True)
+                cerrado = st.radio("¿Se cerró la venta?", ["Sí", "No"], index=0 if row["Cerrado"] == "Sí" else 1, horizontal=True)
+                estado = st.selectbox("Estado actual", ["Pendiente", "Volver a llamar", "Cerrado", "Rechazado"], index=["Pendiente", "Volver a llamar", "Cerrado", "Rechazado"].index(row["Estado"]))
+                proxima = st.date_input("Próxima acción", value=pd.to_datetime(row["Próxima Acción"]))
+
+                st.markdown('<div class="block-title">📝 Ofertas presentadas</div>', unsafe_allow_html=True)
+                ofertas = st.multiselect(
+                    "Ofertas presentadas con",
+                    ["Vodafone", "Yoigo", "Orange", "O2", "RSmovitel", "Plenitude u otras", "ClassicGes"],
+                    default=ofertas_actuales
+                )
+
+                if "Telefonía" in servicio:
+                    st.markdown('<div class="block-title">📱 Datos Telefonía</div>', unsafe_allow_html=True)
+                    lineas = st.number_input("Nº Líneas Móviles", 0, value=int(row["Líneas Móviles"]) if not pd.isna(row["Líneas Móviles"]) and str(row["Líneas Móviles"]).isdigit() else 0)
+                    fibras = st.number_input("Nº Fibras", 0, value=int(row["Fibras"]) if not pd.isna(row["Fibras"]) and str(row["Fibras"]).isdigit() else 0)
+                    centralita = st.radio("¿Tiene centralita?", ["Sí", "No"], index=0 if row["Centralita"] == "Sí" else 1, horizontal=True)
+                    puestos = st.number_input("Nº Puestos Centralita", 0, value=int(row["Puestos"]) if not pd.isna(row["Puestos"]) and str(row["Puestos"]).isdigit() else 0)
+                    ip_fija = st.radio("¿Dispone de IP fija?", ["Sí", "No"], index=0 if row["IP Fija"] == "Sí" else 1, horizontal=True)
+                else:
+                    lineas = fibras = puestos = centralita = ip_fija = ""
+
+                if "Energía" in servicio:
+                    st.markdown('<div class="block-title">⚡ Datos Energía</div>', unsafe_allow_html=True)
+                    mejora_luz = st.radio("¿Se puede mejorar la oferta de luz?", ["Sí", "No"], index=0 if row["Mejora Luz"] == "Sí" else 1, horizontal=True)
+                else:
+                    mejora_luz = ""
+
+                st.markdown('<div class="block-title">🗒️ Observaciones</div>', unsafe_allow_html=True)
+                observaciones = st.text_area("Observaciones", value="" if pd.isna(row["Observaciones"]) else row["Observaciones"])
+
+                if st.form_submit_button("Actualizar visita"):
+                    visitas.at[idx, "Fecha"] = fecha
+                    visitas.at[idx, "Servicio"] = ", ".join(servicio)
+                    visitas.at[idx, "Oportunidad"] = oportunidad
+                    visitas.at[idx, "Presupuesto"] = presupuesto
+                    visitas.at[idx, "Cerrado"] = cerrado
+                    visitas.at[idx, "Estado"] = estado
+                    visitas.at[idx, "Próxima Acción"] = proxima
+                    visitas.at[idx, "Observaciones"] = observaciones
+                    visitas.at[idx, "Ofertas Presentadas"] = ", ".join(ofertas)
+                    visitas.at[idx, "Mejora Luz"] = mejora_luz
+                    visitas.at[idx, "Líneas Móviles"] = lineas
+                    visitas.at[idx, "Fibras"] = fibras
+                    visitas.at[idx, "Centralita"] = centralita
+                    visitas.at[idx, "Puestos"] = puestos
+                    visitas.at[idx, "IP Fija"] = ip_fija
+                    guardar_visitas(visitas)
+                    st.success("✅ Visita actualizada correctamente.")
+                    st.session_state.editar_cliente = None
